@@ -159,6 +159,10 @@ IaC: AWS CDK (TypeScript)
 
 ### 認証の実装方針（確定）
 
+- **サインイン方式: メール + パスワード**
+  - Google フェデレーションを採用しなかった理由: `sub` が IdP ごとに異なり後から
+    変更するとデータが孤立する。加えてフェデレーションの無料枠は 50 MAU と小さく、
+    将来公開する場合の制約になる。外部サービス（Google Cloud）の設定も不要にできる
 - Cognito Hosted UI + Authorization Code Grant with PKCE
 - クライアントは `aws-amplify` の Auth モジュール
 - **トークンを localStorage / sessionStorage に保存しない。** メモリ保持
@@ -202,12 +206,18 @@ IaC: AWS CDK (TypeScript)
   `#[[file:.kiro/specs/database/design.md]]` で参照する
 - steering には「固有の事情」（規約・運用ルール）のみを置き、台帳の実体は持たせない
 
-`#[[file:]]` 記法について: 公式ドキュメント上は steering の機能としてのみ記載されており、
-spec ファイルでの使用は文書化されていない。ただし実際には機能する。展開されなかった場合も
-文字列がポインタとして残るだけで、誤情報が入ることはない（劣化のみ）。
+### `#[[file:]]` 記法の検証結果（重要）
 
-**未完了**: `.kiro/steering/data-model.md` に台帳の実体が残っている。
-`.kiro/specs/database/design.md` を作成してそちらへ移し、steering 側は規約のみに縮小する。
+公式ドキュメント上、この記法は **steering の機能としてのみ記載**されている。
+実際に `.kiro/steering/data-model.md`（inclusion: auto）で検証したところ、
+**参照は展開されず、リテラル文字列としてそのまま返った。**
+
+そのため「参照を書けば自動で内容が注入される」という前提は成立しない。対応:
+
+- `#[[file:]]` は残すが、**それに依存しない。**
+- steering と各 Spec に「**`.kiro/specs/database/design.md` を必ず読むこと**」という
+  明示的な指示を併記する。これは展開の有無に関わらず機能する
+- 展開されなかった場合も文字列がポインタとして残るため、誤情報が入ることはない（劣化のみ）
 
 ### 将来的な強制手段
 
@@ -247,16 +257,31 @@ Spec は機能単位で作成する（ルールは `.kiro/steering/structure.md`
 という全レイヤーを、1日1レコード・属性2つという最小の複雑さで一度貫通できる。
 食事記録は品目配列・集計・マスタ参照が絡み MVP 内で最も複雑なため、型が固まってから着手する。
 
+## 12. 実装構成（確定）
+
+- **モノレポ**: npm workspaces（`packages/*` と `infra`）
+- **テスト**: Vitest
+- **環境数**: 1環境のみデプロイ。ステージ切り替えの仕組みだけ入れる（既定値 `prod`）
+  - 2環境にしてもコスト増はほぼゼロだが、管理の手間が2倍になる
+  - テーブルは削除保護 + PITR があるため1環境でも事故リスクは低い
+- **モジュール配置**: 詳細は `.kiro/steering/structure.md`
+  - PK / SK ビルダーは `packages/backend/keys/`（フロントは SK を知る必要がない）
+  - JST 日付ユーティリティは `packages/shared/date/`（両方が必要）
+  - エンティティ型定義は `packages/shared/types/`
+
+### 環境情報
+
+- AWS アカウント: `354443915910`（IAM ユーザー `inor_dev`）
+- リージョン: `ap-northeast-1`（東京）
+- Node.js v24 / npm 11 / AWS CLI 2.34 / CDK 2.1142
+
+### コスト監視の着手方針
+
+**`cdk bootstrap` より前に AWS Budgets で予算アラートを設定する。**
+課金が始まる前に監視を置く。閾値は実績 $3（約50%）と $6（約100%）。
+Budgets は2つまで無料。フルのコストガードレール（自動停止）は後フェーズ（`cost-guardrail` Spec）。
+
 ## 未決定事項
 
-- [ ] **Cognito のサインイン方式**（`auth-login` Spec の前提）
-      - メール/パスワード or Google フェデレーション
-      - 注意: `sub` は IdP ごとに異なる。PK が `USER#<sub>` なので後から変更すると
-        同じ人物でも別ユーザー扱いになりデータが孤立する。やり直しコストがある
-      - 回避策としてアプリ独自 userId を介在させる設計もあるが、追加の読み取りが
-        発生するため MVP では採用しない（sub を直接使う）
-      - フェデレーションの無料枠は 50 MAU（標準ユーザープールは 10,000 MAU 相当）
 - [ ] 独自ドメインを使うか（Route 53 ホストゾーン $0.50/月）
-- [ ] テスト構成
 - [ ] コーディング規約・デザインシステムの作成（`.kiro/steering/_archive/` を書き直す）
-- [ ] `data-model.md` → `specs/database/design.md` への移行

@@ -94,6 +94,7 @@ DynamoDB（オンデマンド・シングルテーブル）
 
 ### 認証の実装方針
 
+- **サインイン方式: メール + パスワード**（Google フェデレーションは採用しない）
 - Cognito Hosted UI + **Authorization Code Grant with PKCE**
 - クライアントライブラリは `aws-amplify` の Auth モジュール
 - **トークンを localStorage / sessionStorage に保存しない**（XSS で盗まれる）。メモリ保持

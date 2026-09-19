@@ -22,18 +22,37 @@ lifepilot/
     └── decisions.md            # 設計・技術選定の決定メモ
 ```
 
-## 想定する構造
+## 構造（確定）
 
-技術スタック（Vite + React / Lambda / CDK、すべて TypeScript）に基づく想定。
+**npm workspaces によるモノレポ。** すべて TypeScript。
 
 ```
 lifepilot/
-├── frontend/          # Vite + React + Tailwind（静的SPA）
-├── backend/           # Lambda 関数（TypeScript）
-├── infra/             # AWS CDK（TypeScript）
+├── package.json              # workspaces ルート（packages/* と infra）
+├── tsconfig.base.json
+├── packages/
+│   ├── shared/               # frontend / backend 両方が使う
+│   │   ├── date/             # JST 日付ユーティリティ
+│   │   └── types/            # エンティティ型定義
+│   ├── backend/              # Lambda 関数
+│   │   └── keys/             # PK / SK ビルダー（backend 専用）
+│   └── frontend/             # Vite + React + Tailwind（静的SPA）
+├── infra/                    # AWS CDK
 ├── docs/
 └── .kiro/
 ```
+
+**モノレポにした理由**: 全層 TypeScript なので型を1箇所で共有できる見返りが大きい。
+後からモノレポ化するのは面倒なため最初に入れる。
+
+**PK / SK ビルダーを `shared` ではなく `backend` に置く理由**: フロントエンドは API 経由で
+通信するため SK の構造を知る必要がない。`shared` に置くとフロントから import できてしまい
+境界が曖昧になる。日付ユーティリティのみ両方が必要なので `shared` に置く。
+
+### 環境（ステージ）
+
+**1環境のみデプロイする。** ステージ切り替えの仕組みだけ入れておき（既定値 `prod`）、
+必要になってから dev を追加する。個人開発で2環境を維持する手間を避けるため。
 
 ## Spec作成ルール（重要）
 
