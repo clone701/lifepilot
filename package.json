@@ -1,0 +1,24 @@
+{
+  "name": "lifepilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "食事・運動・体重・生活習慣をまとめて管理する生活管理アプリ",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "infra"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --build --force"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

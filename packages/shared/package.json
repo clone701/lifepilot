@@ -1,0 +1,10 @@
+{
+  "name": "@lifepilot/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./date": "./src/date/index.ts",
+    "./types": "./src/types/index.ts"
+  }
+}

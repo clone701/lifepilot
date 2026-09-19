@@ -89,7 +89,7 @@ UTC 基準だと日本時間の午前9時前に記録したものが前日扱い
 | A1 | 今日の全データ（ホーム画面） | `pk = USER#<sub>` AND `begins_with(sk, "D#<today>")` | home-dashboard |
 | A2 | 特定日の特定種別 | `pk = USER#<sub>` AND `begins_with(sk, "D#<date>#MEAL")` | meal-log |
 | A3 | 期間指定（7/30/90日） | `pk = USER#<sub>` AND `sk BETWEEN "D#<from>" AND "D#<to>~"` | body-record など |
-| A4 | 現在有効な目標値 | `pk = USER#<sub>` AND `sk <= "GOAL#<today>"`、降順、Limit 1 | goal |
+| A4 | 現在有効な目標値 | `pk = USER#<sub>` AND `sk BETWEEN "GOAL#" AND "GOAL#<today>~"`、降順、Limit 1 | goal |
 | A5 | 目標値の履歴 | `pk = USER#<sub>` AND `begins_with(sk, "GOAL#")` | goal |
 | A6 | ユーザー登録食品の一覧 | `pk = USER#<sub>` AND `begins_with(sk, "FOOD#")` | food-master |
 | A7 | プロフィール取得 | `pk = USER#<sub>` AND `sk = "PROFILE"`（GetItem） | auth-login |
@@ -101,7 +101,13 @@ UTC 基準だと日本時間の午前9時前に記録したものが前日扱い
   1ページ上限1MB に収まるため、この非効率は許容する。
   種別で絞り込む必要がある場合は取得後にコード側でフィルタする
 - **A3 の終端文字**: `~`（チルダ, U+007E）は ASCII 上 `#`（U+0023）より大きいため、
-  `D#<to>` 配下のアイテムをすべて含められる
+  `D#<to>` 配下のアイテムをすべて含められる。かつ `D#<to+1日>` より小さい
+- **A4 で上限だけを指定してはいけない。** `sk <= "GOAL#<date>"` と書くと
+  `FOOD#`（`F` < `G`）や `D#`（`D` < `G`）のアイテムも条件を満たしてしまう。
+  必ず下限も `GOAL#` で閉じた `BETWEEN` にする
+- **キーに埋め込む値に `#` と `~` を含めてはいけない。** 含めるとキー構造が壊れ、
+  他ユーザーのデータを指すキーを組み立てられる恐れがある（キーインジェクション）。
+  キービルダーが検証する
 - **Scan は使わない。** Query で設計できないアクセスパターンが必要になった場合は、
   キー設計自体を見直す（この design.md を更新する）
 
@@ -285,28 +291,41 @@ PK / SK を組み立てる処理を1モジュールに集約する。
 ### シグネチャ
 
 ```typescript
-// packages/backend/keys/
+// packages/backend/src/keys/
+type SkRange = readonly [start: string, end: string];
+type DatedEntityType = "MEAL" | "BODY" | "EX" | "SLEEP" | "WATER" | "HABIT";
+type MasterEntityType = "GOAL" | "FOOD" | "TPL";
+
 function buildUserPk(sub: string): string;
 function buildProfileSk(): string;
-function buildMealSk(date: string, mealType: MealType, ulid: string): string;
-function buildBodySk(date: string): string;
-function buildExerciseSk(date: string, ulid: string): string;
-function buildGoalSk(effectiveFrom: string): string;
+function buildGoalSk(effectiveFrom: DateString): string;
 function buildFoodSk(foodId: string): string;
+function buildTemplateSk(templateId: string): string;
+function buildMealSk(date: DateString, mealType: MealType, ulid: string): string;
+function buildBodySk(date: DateString): string;
+function buildExerciseSk(date: DateString, ulid: string): string;
 
 // クエリ用のキー条件
-function buildDatePrefix(date: string): string;                       // A1
-function buildDateTypePrefix(date: string, type: EntityType): string; // A2
-function buildDateRange(from: string, to: string): [string, string];  // A3
-function buildGoalUpperBound(date: string): string;                   // A4
-function buildPrefixOf(type: EntityType): string;                     // A5, A6
+function buildDatePrefix(date: DateString): string;                          // A1
+function buildDateTypePrefix(date: DateString, type: DatedEntityType): string; // A2
+function buildDateRange(from: DateString, to: DateString): SkRange;          // A3
+function buildGoalRangeUpTo(date: DateString): SkRange;                      // A4
+function buildMasterPrefix(type: MasterEntityType): string;                  // A5, A6
 
-// packages/shared/date/
-function todayJst(): string;                       // JST の YYYY-MM-DD
-function toJstDateString(d: Date): string;
-function addDaysJst(date: string, days: number): string;
-function isValidDateString(s: string): boolean;
+// packages/shared/src/date/
+type DateString = string;   // YYYY-MM-DD (JST基準)
+
+function todayJst(now?: Date): DateString;
+function toJstDateString(instant: Date): DateString;
+function addDaysJst(date: DateString, days: number): DateString;
+function startOfRecentDaysJst(days: number, today?: DateString): DateString;
+function enumerateDatesJst(from: DateString, to: DateString): DateString[];
+function isValidDateString(value: string): boolean;
+function assertValidDateString(value: string): void;
 ```
+
+**型による誤用防止**: `DatedEntityType` と `MasterEntityType` を分けることで、
+日付軸を持たないエンティティに日付プレフィックスを付けるような誤用を型レベルで防ぐ。
 
 このモジュールは `database` Spec のタスクで作成し、以降の全機能 Spec が利用する。
 
