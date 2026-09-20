@@ -1,3 +1,4 @@
+import type { MealType } from "@lifepilot/shared/types";
 import { describe, expect, it } from "vitest";
 import {
   RANGE_END,
@@ -85,6 +86,17 @@ describe("日付軸 SK", () => {
     expect(() => buildMealSk("2026-02-30", "lunch", ULID)).toThrow(/Invalid date string/);
   });
 
+  it("ulid に # を含む値を拒否する", () => {
+    expect(() => buildMealSk("2026-09-20", "lunch", "x#y")).toThrow(/must not contain/);
+    expect(() => buildExerciseSk("2026-09-20", "x~y")).toThrow(/must not contain/);
+  });
+
+  it("mealType に区切り文字を含む値を拒否する（実行時は型で守れない）", () => {
+    // リクエストボディ由来の値が MealType にキャストされて渡るケースを模す
+    const injected = "lunch#01J8XQZK9M0000000000000000" as MealType;
+    expect(() => buildMealSk("2026-09-20", injected, ULID)).toThrow(/must not contain/);
+  });
+
   it("日付軸エンティティはすべて D# で始まる", () => {
     expect(buildBodySk("2026-09-20").startsWith("D#")).toBe(true);
     expect(buildMealSk("2026-09-20", "dinner", ULID).startsWith("D#")).toBe(true);
@@ -157,6 +169,8 @@ describe("buildDatePrefix - A1（今日の全データ）", () => {
     const prefix = buildDatePrefix("2026-09-20");
     expect(buildProfileSk().startsWith(prefix)).toBe(false);
     expect(buildGoalSk("2026-09-20").startsWith(prefix)).toBe(false);
+    expect(buildFoodSk(ULID).startsWith(prefix)).toBe(false);
+    expect(buildTemplateSk(ULID).startsWith(prefix)).toBe(false);
   });
 });
 
@@ -288,5 +302,20 @@ describe("buildMasterPrefix - A5, A6（マスタ系一覧）", () => {
 
   it("TPL# を返す", () => {
     expect(buildMasterPrefix("TPL")).toBe("TPL#");
+  });
+
+  it("どのマスタ系プレフィックスも日付軸アイテムにマッチしない", () => {
+    const dated = [
+      buildBodySk("2026-09-20"),
+      buildMealSk("2026-09-20", "lunch", ULID),
+      buildExerciseSk("2026-09-20", ULID),
+    ];
+
+    for (const type of ["GOAL", "FOOD", "TPL"] as const) {
+      const prefix = buildMasterPrefix(type);
+      for (const sk of dated) {
+        expect(sk.startsWith(prefix)).toBe(false);
+      }
+    }
   });
 });

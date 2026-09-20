@@ -108,6 +108,12 @@ describe("DataStack - データ保護", () => {
       UpdateReplacePolicy: "Retain",
     });
   });
+
+  it("TTL を設定しない（生活記録は自動削除しない）", () => {
+    synth().hasResourceProperties("AWS::DynamoDB::Table", {
+      TimeToLiveSpecification: Match.absent(),
+    });
+  });
 });
 
 describe("DataStack - ステージ分離", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   addDaysJst,
   assertValidDateString,
@@ -44,6 +44,85 @@ describe("toJstDateString - ゼロ埋め", () => {
     const result = toJstDateString(new Date("2026-03-07T00:00:00Z"));
     expect(result).toHaveLength(10);
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("加算結果もゼロ埋めされる", () => {
+    // 1桁の月・日になるケース（ゼロ埋めを外すと "2027-1-1" になる）
+    expect(addDaysJst("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDaysJst("2026-09-10", -1)).toBe("2026-09-09");
+    expect(addDaysJst("2026-02-01", -1)).toBe("2026-01-31");
+  });
+
+  it("文字列としてソートすると日付順になる（要件5.3）", () => {
+    const dates = ["2026-10-01", "2026-01-05", "2026-09-30", "2025-12-31", "2026-01-15"];
+    expect([...dates].sort()).toEqual([
+      "2025-12-31",
+      "2026-01-05",
+      "2026-01-15",
+      "2026-09-30",
+      "2026-10-01",
+    ]);
+
+    // 生成側（列挙）も昇順と文字列ソート順が一致する
+    const enumerated = enumerateDatesJst("2026-09-28", "2026-10-03");
+    expect(enumerated).toEqual([...enumerated].sort());
+  });
+});
+
+describe("ホストのタイムゾーンに依存しない", () => {
+  const originalTz = process.env.TZ;
+
+  afterEach(() => {
+    // テスト間にタイムゾーン設定を漏らさない
+    if (originalTz === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = originalTz;
+    }
+  });
+
+  // JST より進んだ地域 / 遅れた地域 / JST 自身 / UTC を含める
+  const timezones = ["UTC", "Asia/Tokyo", "Pacific/Kiritimati", "Pacific/Midway", "America/New_York"];
+
+  it("同じ時刻はどのタイムゾーンでも同じ JST 日付になる", () => {
+    // JST の日付境界をまたぐ前後の時刻
+    const instants = [
+      "2026-09-20T14:59:59Z",
+      "2026-09-20T15:00:00Z",
+      "2026-09-20T00:00:00Z",
+      "2026-09-20T23:59:59Z",
+      "2025-12-31T15:00:00Z",
+    ];
+
+    for (const instant of instants) {
+      const results = timezones.map((tz) => {
+        process.env.TZ = tz;
+        return toJstDateString(new Date(instant));
+      });
+
+      // すべてのタイムゾーンで結果が一致すること
+      expect(new Set(results).size).toBe(1);
+    }
+  });
+
+  it("JST 境界の期待値はタイムゾーンを変えても変わらない", () => {
+    for (const tz of timezones) {
+      process.env.TZ = tz;
+      expect(toJstDateString(new Date("2026-09-20T15:00:00Z"))).toBe("2026-09-21");
+      expect(toJstDateString(new Date("2026-09-20T14:59:59Z"))).toBe("2026-09-20");
+      expect(toJstDateString(new Date("2026-09-20T00:00:00Z"))).toBe("2026-09-20");
+      expect(todayJst(new Date("2026-09-20T16:30:00Z"))).toBe("2026-09-21");
+    }
+  });
+
+  it("日付の加減算・列挙もタイムゾーンに依存しない", () => {
+    for (const tz of timezones) {
+      process.env.TZ = tz;
+      expect(addDaysJst("2026-09-30", 1)).toBe("2026-10-01");
+      expect(addDaysJst("2026-01-01", -1)).toBe("2025-12-31");
+      expect(startOfRecentDaysJst(90, "2026-09-20")).toBe("2026-06-23");
+      expect(enumerateDatesJst("2026-06-23", "2026-09-20")).toHaveLength(90);
+    }
   });
 });
 

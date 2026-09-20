@@ -92,6 +92,9 @@ function datePart(date: DateString): string {
 }
 
 export function buildMealSk(date: DateString, mealType: MealType, ulid: string): string {
+  // mealType は型では MealType に絞られているが、リクエストボディ由来の値は
+  // 実行時には任意の文字列になりうるため、ここでも区切り文字を検証する
+  assertKeySegment(mealType, "mealType");
   assertKeySegment(ulid, "ulid");
   return `${datePart(date)}${SEP}MEAL${SEP}${mealType}${SEP}${ulid}`;
 }
