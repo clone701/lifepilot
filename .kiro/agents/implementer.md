@@ -61,8 +61,15 @@ permissions:
       effect: allow
 
     # 破壊的操作と、予算に影響するデプロイは拒否する。
+    #
     # git commit を拒否する理由: PO のレビューを通らない変更が履歴に入る経路を塞ぐため。
-    # 変更は作業ツリーに残り、PO が diff を読んでから確定される
+    # 変更は作業ツリーに残り、PO が diff を読んでから確定される。
+    #
+    # 先頭ワイルドカード（例: "*cdk deploy*"）を使ってはいけない。
+    # グロブはシェルコマンド全体の文字列に対して評価されるため、
+    # コミットメッセージやファイル名に該当する語が含まれるだけで拒否される。
+    # 前置コマンドを挟む形（cd infra && npx cdk deploy）はすり抜けるため、
+    # 権限ルールは多層防御の1枚と位置づける。
     - capability: shell
       match:
         - "git commit*"
@@ -72,9 +79,14 @@ permissions:
         - "git branch -D*"
         - "rm -rf *"
         - "Remove-Item -Recurse -Force*"
-        - "*cdk deploy*"
-        - "*cdk destroy*"
-        - "*cdk bootstrap*"
+        - "cdk deploy*"
+        - "cdk destroy*"
+        - "cdk bootstrap*"
+        - "npx cdk deploy*"
+        - "npx cdk destroy*"
+        - "npx cdk bootstrap*"
+        - "npm run deploy*"
+        - "npm run bootstrap*"
         - "aws * delete-*"
         - "aws * terminate-*"
         - "aws * create-*"

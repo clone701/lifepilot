@@ -53,7 +53,16 @@ permissions:
         - "node *"
       effect: allow
 
-    # 破壊的操作と、予算に影響するデプロイは拒否する
+    # 破壊的操作と、予算に影響するデプロイは拒否する。
+    #
+    # 先頭ワイルドカード（例: "*cdk deploy*"）を使ってはいけない。
+    # グロブはシェルコマンド全体の文字列に対して評価されるため、
+    # コミットメッセージやファイル名に該当する語が含まれるだけで拒否される
+    # （実際に "cdk deploy" を含むコミットメッセージが拒否された）。
+    #
+    # 前置コマンドを挟む形（cd infra && npx cdk deploy）はすり抜ける。
+    # 権限ルールは多層防御の1枚であり、単体で保証するものではない。
+    # 実際の歯止めはプロンプトの指示と、デプロイをユーザーが行う運用。
     - capability: shell
       match:
         - "git push --force*"
@@ -63,9 +72,14 @@ permissions:
         - "git branch -D*"
         - "rm -rf *"
         - "Remove-Item -Recurse -Force*"
-        - "*cdk deploy*"
-        - "*cdk destroy*"
-        - "*cdk bootstrap*"
+        - "cdk deploy*"
+        - "cdk destroy*"
+        - "cdk bootstrap*"
+        - "npx cdk deploy*"
+        - "npx cdk destroy*"
+        - "npx cdk bootstrap*"
+        - "npm run deploy*"
+        - "npm run bootstrap*"
         - "aws * delete-*"
         - "aws * terminate-*"
       effect: deny
