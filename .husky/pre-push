@@ -1,0 +1,7 @@
+# 段2: push 前に全体を検査する。いずれかが失敗したら push を中断する
+set -e
+
+# 検査内容は CI と同じ npm スクリプトを呼ぶ（設定を二重管理しないため）。
+# validate = format:check + lint + typecheck + test（CI の対応ステップと同じ実体）
+npm run validate
+npm run audit:high

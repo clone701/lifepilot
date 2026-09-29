@@ -17,6 +17,7 @@ fileMatchPattern: ".kiro/specs/**/requirements.md|.kiro/specs/**/design.md"
 受け入れ基準は **EARS (Easy Approach to Requirements Syntax)** 形式で記述すること。
 
 **5つのパターン:**
+
 1. **Ubiquitous**: `<システム>は<動作>する`
 2. **Event-driven**: `WHEN <トリガー>、<システム>は<動作>する`
 3. **State-driven**: `WHILE <状態>、<システム>は<動作>する`
@@ -24,6 +25,7 @@ fileMatchPattern: ".kiro/specs/**/requirements.md|.kiro/specs/**/design.md"
 5. **Unwanted**: `IF <条件>、<システム>は<動作>する`
 
 **例:**
+
 ```markdown
 ノートページは /notes URLでアクセス可能である
 WHEN ユーザーがタブをクリックする場合、タブナビゲーションは選択状態を表示する
@@ -72,6 +74,7 @@ IF 検索結果が0件の場合、「該当するチャンピオンが見つか�
 キー設計やエンティティ構造をコピーしてはいけない。二重管理は必ず食い違う。
 
 **✅ 良い例**:
+
 ```markdown
 ## Data Models
 
@@ -101,6 +104,7 @@ spec ファイルでの展開は確認できていない。展開されない場
 ### 良い例と悪い例
 
 **❌ 悪い例（実装コードを書いている）**:
+
 ```typescript
 export default function DeleteConfirmationDialog({ isOpen, onConfirm }: Props) {
   if (!isOpen) return null;
@@ -113,6 +117,7 @@ export default function DeleteConfirmationDialog({ isOpen, onConfirm }: Props) {
 ```
 
 **✅ 良い例（設計のみ）**:
+
 ```typescript
 interface DeleteConfirmationDialogProps {
   isOpen: boolean;
@@ -122,6 +127,7 @@ interface DeleteConfirmationDialogProps {
 ```
 
 **UI要素**:
+
 - オーバーレイ（黒50%透明）
 - ダイアログボックス（白背景、角丸）
 - 削除ボタン（赤色）、キャンセルボタン（グレー）

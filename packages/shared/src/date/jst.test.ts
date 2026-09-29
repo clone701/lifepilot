@@ -82,7 +82,13 @@ describe("ホストのタイムゾーンに依存しない", () => {
   });
 
   // JST より進んだ地域 / 遅れた地域 / JST 自身 / UTC を含める
-  const timezones = ["UTC", "Asia/Tokyo", "Pacific/Kiritimati", "Pacific/Midway", "America/New_York"];
+  const timezones = [
+    "UTC",
+    "Asia/Tokyo",
+    "Pacific/Kiritimati",
+    "Pacific/Midway",
+    "America/New_York",
+  ];
 
   it("同じ時刻はどのタイムゾーンでも同じ JST 日付になる", () => {
     // JST の日付境界をまたぐ前後の時刻

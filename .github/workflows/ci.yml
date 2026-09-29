@@ -1,0 +1,100 @@
+# 段3（CI）: ローカルの段1〜2と同じ検査を、回避できない場所で実行する。
+#
+# 設計上の約束（design.md 8章 / 要件1, 5, 7）:
+#   - 検査の中身は npm スクリプトを呼ぶだけにする。しきい値やバージョンを
+#     この YAML に転記しない（設定の二重管理を避ける。要件7.2, 7.3）
+#   - `continue-on-error` と `|| true` は使わない。落ちるべきものは落とす
+#   - ステップは「速く落ちるもの」から順に並べる
+#
+# 整形チェック / lint / 型検査 / テストは、ローカルの `npm run validate` が呼ぶものと
+# 同じ npm スクリプトを、同じ順序で個別ステップとして実行する。
+# `validate` に集約せず分けている理由: どの検査で落ちたかがステップ名で分かるため。
+# 1ステップに束ねると失敗箇所をログから探すことになる。
+# 検査の中身は npm スクリプト側にあるので、分けてもローカルと食い違わない。
+# 項目の増減が必要になったときは package.json の `validate` と本ファイルを同時に直す。
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  # 週次実行。コード変更がない期間も依存の脆弱性を検査する（要件5.5）。
+  # cron は UTC。月曜 0:00 UTC = 月曜 9:00 JST。
+  schedule:
+    - cron: "0 0 * * 1"
+
+# GITHUB_TOKEN の既定権限は広いため明示的に絞る。
+# 本ワークフローはデプロイを含まず、読み取りだけで足りる。
+permissions:
+  contents: read
+
+# 同一 ref で新しい push があったら進行中の実行を打ち切る。
+# 無料枠の実行時間を古いコミットの検査に使わないため。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 全体が TypeScript のモノレポなのでジョブは分割しない（design.md 8章）
+  verify:
+    name: 品質ゲート
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # gitleaks が履歴を検査するため、浅いクローンにしない（要件3.3）
+      - name: チェックアウト（履歴全体）
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+
+      # バージョンは .nvmrc を唯一の正とし、YAML に値を書かない（要件7.3）
+      - name: Node をセットアップ
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: 依存をインストール
+        run: npm ci
+
+      # 履歴の機密情報検査。除外設定は .gitleaks.toml（唯一）を明示的に参照する。
+      # このリポジトリの所有者は個人アカウントなので GITLEAKS_LICENSE は不要
+      # （Organization 所有のリポジトリでは無料ライセンスキーが必須になる）。
+      - name: 機密情報検査（コミット履歴）
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          # アカウント種別の判定に GitHub API を呼ぶため必要。自動発行のトークン
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # PR へのコメントには pull-requests: write が必要になる。権限を広げないため無効化する
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          # 検出結果（機密情報の値を含む）を成果物として残さない（design.md 11章）
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+      # 作業ツリーの機密情報検査。段1（pre-commit）と同じ secretlint 設定を使う
+      - name: 機密情報検査（作業ツリー）
+        run: npm run secretlint
+
+      # ここから4ステップが `npm run validate` と同じ実体・同じ順序（要件7.2）
+      - name: 整形チェック
+        run: npm run format:check
+
+      # --max-warnings 0 は npm スクリプト側に持たせている。警告のみでも失敗する（要件1.3）
+      - name: lint
+        run: npm run lint
+
+      - name: 型検査
+        run: npm run typecheck
+
+      - name: テスト
+        run: npm test
+
+      # 予算ガードレール Aspect と cdk-nag はここで動く（要件2.1, 4.2）。
+      # --quiet はテンプレート本文の出力を抑えるだけで、検査結果は出る
+      - name: cdk synth（予算ガードレール / cdk-nag）
+        run: npm run synth --workspace @lifepilot/infra -- --quiet
+
+      # しきい値は audit:high スクリプトが唯一の正。pre-push と同じものを呼ぶ（要件5.2, 6.4）
+      - name: 依存の脆弱性検査
+        run: npm run audit:high

@@ -27,7 +27,7 @@ inclusion: manual
 # Pydantic例
 class NoteCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=100)
-    
+
     @validator('title')
     def sanitize(cls, v):
         if '<script>' in v.lower():

@@ -5,20 +5,49 @@
   "description": "食事・運動・体重・生活習慣をまとめて管理する生活管理アプリ",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "workspaces": [
     "packages/*",
     "infra"
   ],
   "scripts": {
+    "prepare": "husky",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --build --force"
+    "typecheck": "tsc --build --force",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "validate": "npm run format:check && npm run lint && npm run typecheck && npm test",
+    "secretlint": "secretlint --secretlintignore .secretlintignore \"**/*\"",
+    "audit:high": "npm audit --audit-level=high"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0 --no-warn-ignored",
+      "prettier --write",
+      "secretlint --no-glob",
+      "vitest related --run --passWithNoTests"
+    ],
+    "*.{json,md,yml,css}": [
+      "prettier --write",
+      "secretlint --no-glob"
+    ]
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@secretlint/secretlint-rule-preset-recommend": "13.0.5",
     "@types/node": "24.10.1",
+    "eslint": "10.11.0",
+    "eslint-config-prettier": "10.1.8",
+    "husky": "9.1.7",
+    "lint-staged": "17.5.1",
+    "prettier": "3.9.8",
+    "secretlint": "13.0.5",
     "typescript": "5.9.3",
-    "vitest": "3.2.4"
+    "typescript-eslint": "8.70.0",
+    "vitest": "3.2.7"
   }
 }
