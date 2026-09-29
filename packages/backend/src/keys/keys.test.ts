@@ -257,7 +257,11 @@ describe("buildGoalRangeUpTo - A4（現在有効な目標値）", () => {
 
   it("指定日以前の目標値を含む", () => {
     const [start, end] = buildGoalRangeUpTo("2026-09-20");
-    for (const sk of [buildGoalSk("2026-01-01"), buildGoalSk("2026-09-01"), buildGoalSk("2026-09-20")]) {
+    for (const sk of [
+      buildGoalSk("2026-01-01"),
+      buildGoalSk("2026-09-01"),
+      buildGoalSk("2026-09-20"),
+    ]) {
       expect(sk >= start && sk <= end).toBe(true);
     }
   });

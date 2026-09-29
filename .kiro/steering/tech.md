@@ -1,6 +1,7 @@
 # 技術スタック定義
 
-> **重要**: このプロジェクトはまだ設計フェーズであり、コードは存在しない。
+> **重要**: 実装は `database` / `ci-cd` Spec の範囲まで進んでいる（`packages/shared`、
+> `packages/backend/keys`、`infra`、品質ゲート）。フロントエンドと API はまだ存在しない。
 > 以下の「確定」以外の項目は**未確定**であり、確定前提で実装を進めてはいけない。
 > 不明な点は推測せず確認する。
 
@@ -12,6 +13,9 @@
 超える可能性がある選択をする場合は、実装前に必ず理由と概算を提示して確認を取る。
 
 ### 絶対に踏んではいけない構成（単独で予算を超える）
+
+**この節は文書上の約束ではなく、`cdk synth` 時に強制される**（下記「品質ゲート」参照）。
+禁止リソースを定義すると合成が失敗する。
 
 - **VPC を作らない。** Lambda や SSR compute を VPC に入れると NAT Gateway が必要になり
   約 $35〜45/月（予算の5倍以上）。DynamoDB は HTTPS で到達できるため VPC は不要
@@ -75,6 +79,7 @@ DynamoDB（オンデマンド・シングルテーブル）
 ```
 
 **Amplify Hosting は採用しない。** 採用しなかった理由:
+
 - SSR compute のコールドスタートが1〜3秒。CDN 配信なら0秒
 - 認証の検証をアプリコードで書く必要があり、1箇所の書き忘れが情報漏洩になる
 - ビルド分数・SSRリクエスト・compute・転送の4軸課金でコスト予測性が低い
@@ -91,6 +96,9 @@ DynamoDB（オンデマンド・シングルテーブル）
 - **Next.js は採用しない。** 静的SPA構成では SSR / Server Components /
   Route Handlers が使えず、Next.js を選ぶ利点がないうえ static export の制約を背負うため
 - IaC: **AWS CDK（TypeScript）**
+- テスト: **Vitest**（`vitest.config.ts` が唯一の設定。フロントエンド用の jsdom 環境は
+  `auth-login` Spec で追加する）
+- Node のバージョンは **`.nvmrc` を唯一の正**とする。値を他のファイルに転記しない
 
 ### 認証の実装方針
 
@@ -113,6 +121,33 @@ DynamoDB（オンデマンド・シングルテーブル）
 - 食品マスタは「可食部100gあたり」を基準値として保持し、分量換算はアプリ側で行う
 - 外部由来データと自前登録データを区別できるスキーマにする
 
+### 品質ゲート（規約の自動検査）
+
+**規約は可能なものを自動検査に移している。** 下表で検査手段があるものは機械的に守られ、
+「未検査」のものは**文書上の約束にすぎない**（人が守る必要がある）。
+
+| 規約                                                                                      | 検査手段                                                         |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 禁止リソース（NAT GW / ALB / RDS / RDS Proxy / Secrets Manager / 顧客管理 KMS）を作らない | `infra/src/aspects/budget-guardrail.ts`（`cdk synth` が失敗）    |
+| DynamoDB は GSI / LSI を持たず、オンデマンド課金にする                                    | 同上                                                             |
+| IaC のセキュリティ（S3 の公開、過剰な IAM 権限など）                                      | cdk-nag（`infra/src/aspects/nag-policy.ts`。Warning も失敗扱い） |
+| フロントエンドは `@lifepilot/backend` を import しない                                    | ESLint `no-restricted-imports`                                   |
+| SK 文字列を直書きしない                                                                   | `packages/backend/src/keys/` の型（`database` Spec）             |
+| 型エラー・lint 警告を残さない                                                             | `tsc --build` / ESLint（警告も失敗扱い）                         |
+| 整形の統一                                                                                | Prettier                                                         |
+| 機密情報をコミットしない                                                                  | secretlint（作業ツリー・コミット時）/ gitleaks（履歴・CI のみ）  |
+| 依存の脆弱性を放置しない                                                                  | `npm audit`（しきい値は `audit:high` スクリプトが唯一の正）      |
+| CloudWatch Logs に retention を設定する                                                   | **未検査**                                                       |
+| 栄養値は書き込み時スナップショットにする                                                  | **未検査**                                                       |
+| API Gateway は HTTP API を使う                                                            | **未検査**                                                       |
+| `userId` は JWT の claims から取得する                                                    | **未検査**                                                       |
+
+検査は保存時 → pre-commit → pre-push → CI → 週次の多層で走る。husky + lint-staged と
+GitHub Actions の構成、各段の責務は `.kiro/specs/ci-cd/design.md` を参照する。
+
+**版数と設定値を本ファイルに転記しない。** 版数は `package.json`、設定は各ツールの
+設定ファイル（各1つのみ）が唯一の正。判断の経緯は `docs/decisions.md` の13〜24にある。
+
 ## 未確定事項
 
 実装着手前に設計・提案・合意が必要な項目。
@@ -122,9 +157,10 @@ DynamoDB（オンデマンド・シングルテーブル）
     データが孤立する。やり直しコストがある
 - **独自ドメインを使うか**（Route 53 ホストゾーン $0.50/月）
 - **AI API**: 利用するサービス（Amazon Bedrock 等）は AI機能フェーズで決定する
-- **テスト構成**
-- **コーディング規約・デザインシステム**（`.kiro/steering/_archive/` に別プロジェクト由来の
-  未整備ファイルがある。LifePilot 用に書き直してから使う）
+- **デザインシステム**（`.kiro/steering/_archive/` に別プロジェクト由来の未整備ファイルがある。
+  LifePilot 用に書き直してから使う）
+  - 整形と lint の規約は ESLint / Prettier に移したため文書化しない。
+    残るのは命名・UI の一貫性など機械検査できない部分のみ
 
 ## コスト管理（重要要件・実装は後フェーズ）
 

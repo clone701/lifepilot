@@ -16,16 +16,7 @@ import type { DateString } from "../date/index.js";
  * SK のパースではなくこの属性で判別する。
  */
 export type EntityType =
-  | "PROFILE"
-  | "GOAL"
-  | "FOOD"
-  | "TPL"
-  | "MEAL"
-  | "BODY"
-  | "EX"
-  | "SLEEP"
-  | "WATER"
-  | "HABIT";
+  "PROFILE" | "GOAL" | "FOOD" | "TPL" | "MEAL" | "BODY" | "EX" | "SLEEP" | "WATER" | "HABIT";
 
 /** 食事区分。SK の一部になるため値を変更してはいけない。 */
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -142,10 +133,4 @@ export interface ProfileItem extends BaseItem {
 }
 
 /** MVP で扱う全エンティティの判別可能ユニオン。 */
-export type LifePilotItem =
-  | ProfileItem
-  | GoalItem
-  | FoodItem
-  | MealItem
-  | BodyItem
-  | ExerciseItem;
+export type LifePilotItem = ProfileItem | GoalItem | FoodItem | MealItem | BodyItem | ExerciseItem;

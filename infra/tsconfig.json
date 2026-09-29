@@ -6,14 +6,17 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     // CDK のライブラリは CommonJS のため、CDK アプリも CommonJS で扱う。
     // ESM/CJS の相互運用でつまずかない、最も実績のある構成。
-    "module": "CommonJS",
-    "moduleResolution": "node10",
+    //
+    // module/moduleResolution に NodeNext を使う理由:
+    // 出力形式は package.json の "type" から決まる。infra/package.json に
+    // "type" がないため CommonJS で出力される。挙動は "module": "CommonJS" と同じ。
+    // 以前指定していた "moduleResolution": "node10" は TypeScript 7.0 で廃止される。
+    // なお node10 を node16 に替えることはできない（node16 系の moduleResolution は
+    // module も node16 系である必要があるため）。
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
     "verbatimModuleSyntax": false,
-    "lib": [
-      "ES2022"
-    ]
+    "lib": ["ES2022"]
   },
-  "include": [
-    "src/**/*.ts"
-  ]
+  "include": ["src/**/*.ts"]
 }

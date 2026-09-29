@@ -1,0 +1,15 @@
+# 依存関係・ビルド成果物
+node_modules/
+dist/
+build/
+coverage/
+
+# AWS CDK の合成結果（自動生成）
+cdk.out/
+infra/cdk.out/
+
+# lock ファイル（npm が管理する）
+package-lock.json
+
+# Kiro が生成・更新するメタデータ（整形するとツール側の書き込みと衝突する）
+.kiro/specs/**/*.meta.json

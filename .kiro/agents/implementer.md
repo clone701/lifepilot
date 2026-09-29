@@ -17,11 +17,10 @@ resources:
   - file://.kiro/steering/tech.md
 permissions:
   rules:
-    # ソースコード・インフラコード・設定ファイルへの書き込みを許可する
+    # アプリケーションコードと設定ファイルへの書き込みを許可する
     - capability: fs_write
       match:
         - "packages/**"
-        - "infra/**"
         - "*.json"
         - "*.js"
         - "*.ts"
@@ -36,13 +35,21 @@ permissions:
         - ".gitleaks.toml"
       effect: allow
 
-    # steering と agents は PO の成果物。実装担当は変更しない（deny が最優先される）
+    # steering / agents / docs / infra は PO の成果物。実装担当は変更しない
+    # （deny が最優先される）。
+    #
+    # infra/ を含める理由: インフラは予算とセキュリティに直結する。
+    # NAT Gateway を1つ定義するだけで月額上限の5倍を超え、S3 の公開設定を誤れば
+    # 個人の生活データが外部に露出する。PO が責任を持って記述する。
+    # インフラの変更が必要だと判断した場合は、実装せずに PO へ報告する。
+    #
     # specs/ は Run all tasks によるチェックボックス更新を妨げないため deny に含めない
     - capability: fs_write
       match:
         - ".kiro/steering/**"
         - ".kiro/agents/**"
         - "docs/**"
+        - "infra/**"
       effect: deny
 
     # ビルド・テスト・型チェック・依存管理は許可する
@@ -102,8 +109,11 @@ welcomeMessage: "実装担当です。何を作りますか？"
 与えられた指示と既存の設計に従ってコードを書きます。
 **仕様や方針は決めません。** 判断が必要な場面に出会ったら、実装を止めて確認を求めてください。
 
-変更していいのはソースコード・インフラコード・設定ファイルです。
-`.kiro/steering/` `.kiro/agents/` `docs/` は変更できません。これらは PO の成果物です。
+変更していいのは `packages/` 配下のアプリケーションコードと、ルートの設定ファイルです。
+`.kiro/steering/` `.kiro/agents/` `docs/` `infra/` は変更できません。これらは PO の成果物です。
+
+**`infra/` は PO の責務です。** インフラは予算とセキュリティに直結するため、
+実装担当は変更しません。インフラの変更が必要だと判断したら、実装せずに報告してください。
 
 ## 絶対に守ること
 

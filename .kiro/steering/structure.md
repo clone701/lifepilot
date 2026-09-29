@@ -1,26 +1,8 @@
 # リポジトリ構造定義
 
-> **重要**: アプリケーションのディレクトリ構造は**まだ実体がない**。
-> 下記「想定する構造」は方針であり、最初の Spec で確定させる。
-> 実装前に必ず確認する。
-
-## 現在の構造
-
-```
-lifepilot/
-├── .kiro/
-│   ├── specs/                  # Spec定義ファイル（未作成）
-│   └── steering/
-│       ├── ai-instructions.md  # AI向け共通指示（常時適用）
-│       ├── product.md          # プロダクト定義（常時適用）
-│       ├── structure.md        # 本ファイル（常時適用）
-│       ├── tech.md             # 技術スタック定義（常時適用）
-│       ├── spec-guidelines.md  # Spec作成ガイドライン（Spec編集時）
-│       ├── data-model.md       # DynamoDBキー設計（specs/database/ へ移行予定）
-│       └── _archive/           # 別プロジェクトから流用した未整備のsteering
-└── docs/
-    └── decisions.md            # 設計・技術選定の決定メモ
-```
+> **重要**: `packages/frontend` はまだ存在しない（`auth-login` Spec で作成する）。
+> 下記の構造のうち、実体があるのは `packages/shared` / `packages/backend` / `infra` と
+> ルートの設定ファイル群。
 
 ## 構造（確定）
 
@@ -28,7 +10,7 @@ lifepilot/
 
 ```
 lifepilot/
-├── package.json              # workspaces ルート（packages/* と infra）
+├── package.json              # workspaces ルート（packages/* と infra）+ lint-staged 設定
 ├── tsconfig.base.json
 ├── packages/
 │   ├── shared/               # frontend / backend 両方が使う
@@ -36,11 +18,33 @@ lifepilot/
 │   │   └── types/            # エンティティ型定義
 │   ├── backend/              # Lambda 関数
 │   │   └── keys/             # PK / SK ビルダー（backend 専用）
-│   └── frontend/             # Vite + React + Tailwind（静的SPA）
+│   └── frontend/             # Vite + React + Tailwind（静的SPA・未作成）
 ├── infra/                    # AWS CDK
-├── docs/
+│   └── src/
+│       ├── stacks/           # スタック定義
+│       └── aspects/          # 合成時に規約を強制する Aspect（予算 / cdk-nag）
+├── docs/                     # decisions.md（決定・未決定の記録）
 └── .kiro/
+    ├── specs/                # 機能単位の Spec
+    └── steering/             # 常時適用の方針（_archive/ は未適合・manual）
 ```
+
+### ツール設定ファイルの配置
+
+**各ツールの設定はルートに1つだけ置く。** 同じツールの設定を複数箇所に置かない
+（どちらが有効か分からなくなるため）。テストはソースと同じ場所に `*.test.ts` で置く。
+
+```
+lifepilot/
+├── .nvmrc / eslint.config.js / .prettierrc(+ignore)
+├── .secretlintrc.json(+ignore) / .gitleaks.toml / vitest.config.ts
+├── .husky/                   # pre-commit / pre-push
+├── .vscode/                  # settings.json / extensions.json（git 管理下・共有する）
+└── .github/                  # workflows/ci.yml / dependabot.yml
+```
+
+ファイルの一覧と各段の責務は `.kiro/specs/ci-cd/design.md`、
+設定値は各ファイル自体が唯一の正。本ファイルに設定値を転記しない。
 
 **モノレポにした理由**: 全層 TypeScript なので型を1箇所で共有できる見返りが大きい。
 後からモノレポ化するのは面倒なため最初に入れる。
@@ -76,21 +80,27 @@ lifepilot/
 - インフラは**それを必要とする機能 Spec のタスクに含める**
   （例: Cognito は `auth-login`、DynamoDB テーブルは `database`）
 - **インフラ自体が成果物になるものだけ独立 Spec** にする
-  （例: `cost-guardrail`、将来の `ci-cd`）
+  （例: `ci-cd`、将来の `cost-guardrail`）
 - IaC コードの全体像は `infra/` のスタック分割で管理する。Spec 階層で表現しない
 
 ## 構造に関する方針
 
+自動検査があるものは【検査あり】と記す。それ以外は**文書上の約束**であり、人が守る。
+検査手段の一覧は `.kiro/steering/tech.md` の「品質ゲート」にある。
+
+- 【検査あり】**フロントエンドは `@lifepilot/backend` を import しない**（ESLint が禁止）
+- 【検査あり】**DynamoDB の SK を組み立てる処理は1モジュールに集約する。** SK 文字列を
+  各所で直書きしない（`packages/backend/src/keys/` の型で不可能にしている）
 - **レイヤー間の依存は一方向**にする（UI → ロジック → 外部サービスアダプタ）
 - **外部サービス（Cognito、DynamoDB、AI API等）へのアクセスはアダプタ層に隔離**する。
   UIやビジネスロジックが外部SDKに直接依存しないようにする
 - **機能単位でまとめる**。食事 / 体重 / 運動 / 目標といったドメインごとに分割する
-- **DynamoDB の SK を組み立てる処理は1モジュールに集約する。** SK 文字列を各所で
-  直書きしない（キー命名規則の違反を型レベルで防ぐため）
 
 ## steering運用ルール
 
 - `_archive/` 配下のファイルは別プロジェクト（LoL Lab）から持ち込んだもので、
   LifePilot には未適合。`inclusion: manual` にしてあり自動では適用されない
-- コーディング規約・デザインシステムは**技術スタック確定後**に作成する。
-  作るものが決まる前に規約を固めると、実装時に矛盾が生じる
+- **機械的に検査できる規約は steering に書かない。** 整形・lint・import 境界のように
+  ツールで強制できるものは設定ファイル側を唯一の正とし、steering には
+  「どこで検査されるか」だけを書く（二重管理を避けるため）
+- デザインシステムは機械検査できない部分のみを対象に、実装が進んでから作成する

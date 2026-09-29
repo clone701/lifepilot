@@ -19,6 +19,27 @@ function synth(stage: "prod" | "dev" = "prod"): Template {
   return Template.fromStack(stack);
 }
 
+/**
+ * 合成結果から DynamoDB テーブル名を取り出す。
+ *
+ * `findResources` の戻り値は `Properties` が `any` のため、
+ * ここで `unknown` に落としてから型を確かめる（`any` をテスト本体に漏らさない）。
+ * 取り出せない場合は黙って undefined を返さず失敗させる。
+ */
+function synthesizedTableName(stage: "prod" | "dev"): string {
+  const resources: Record<string, { Properties?: unknown }> =
+    synth(stage).findResources("AWS::DynamoDB::Table");
+  const properties = Object.values(resources)[0]?.Properties;
+  if (typeof properties !== "object" || properties === null || !("TableName" in properties)) {
+    throw new Error(`${stage}: 合成結果に TableName を持つ DynamoDB テーブルがありません`);
+  }
+  const tableName = properties.TableName;
+  if (typeof tableName !== "string") {
+    throw new Error(`${stage}: TableName が文字列ではありません: ${JSON.stringify(tableName)}`);
+  }
+  return tableName;
+}
+
 describe("DataStack - キー設計", () => {
   it("PK は pk（String）、SK は sk（String）", () => {
     synth().hasResourceProperties("AWS::DynamoDB::Table", {
@@ -130,11 +151,7 @@ describe("DataStack - ステージ分離", () => {
   });
 
   it("ステージごとにテーブル名が異なる（環境が混ざらない）", () => {
-    const prodName = synth("prod").findResources("AWS::DynamoDB::Table");
-    const devName = synth("dev").findResources("AWS::DynamoDB::Table");
-    const prod = Object.values(prodName)[0]?.Properties?.["TableName"];
-    const dev = Object.values(devName)[0]?.Properties?.["TableName"];
-    expect(prod).not.toBe(dev);
+    expect(synthesizedTableName("prod")).not.toBe(synthesizedTableName("dev"));
   });
 });
 

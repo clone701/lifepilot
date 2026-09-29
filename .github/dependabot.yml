@@ -1,0 +1,42 @@
+# 段5（Dependabot）: 依存の更新を定期的に提案させる（要件5.3, 5.4 / design.md 9章）。
+#
+# エントリは npm と github-actions の2つだけ。npm workspaces はルートの
+# package-lock.json を1つ見るため、packages/* ごとのエントリは不要。
+#
+# 提案された PR は CI（段3）で検証される。更新を取り込むかどうかは人が判断する。
+version: 2
+updates:
+  # npm（ルートの lock ファイルが workspaces 全体を含む）
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    commit-message:
+      # 更新 PR を履歴上で見分けられるようにする。scope にパッケージ名が入る
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: "scope"
+    # メジャー更新は提案しない。破壊的変更は手元で確認してから上げる（要件5.4）
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions。ci.yml の uses はコミット SHA 固定だが、Dependabot は
+  # SHA を追跡して更新し、末尾の `# vX.Y.Z` コメントも書き換える。
+  # タグ参照に戻す必要はない（タグは可変なので固定のままにする）。
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    commit-message:
+      prefix: "chore(deps)"
+    # Action のメジャー更新も入力仕様が変わるため手動で確認する（要件5.4）
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
